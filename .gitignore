@@ -9,3 +9,7 @@ ui/data/
 __pycache__/
 .vercel/
 .DS_Store
+
+# screen recordings and exported videos
+*.mov
+*.mp4
