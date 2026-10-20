@@ -1,0 +1,1 @@
+window.__store(9,{"stars":[0,0,0,0,5],"pos":[["good sub",1]],"neg":[],"aspects":[["food",1,0]],"reviews":[{"d":"2025-10-05","r":5,"x":"Good","p":[],"w":1},{"d":"2025-09-06","r":5,"x":"Good","p":[],"w":1},{"d":"2025-02-12","r":5,"x":"Best sub ,I loved it  and the neatness is excellent \ud83d\udcaf","p":[["good sub",1,"food"]],"w":1}]});

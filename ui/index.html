@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Subway store review health</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  :root {
+    --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --line: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,.10);
+    --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b; --none: #898781;
+    --good-wash: #e7f5e7; --critical-wash: #fbeaea; --star: #eda100; --accent: #2a78d6;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: var(--page); }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .app { display: grid; grid-template-columns: 360px 1fr 440px; height: 100%; }
+  .app.no-detail { grid-template-columns: 360px 1fr 0; }
+
+  /* ---- left: overview + store list ---- */
+  .side { display: flex; flex-direction: column; background: var(--page); border-right: 1px solid var(--line); min-height: 0; overflow-y: auto; }
+  .hero-card { background: #1a1a19; color: #f0efec; padding: 18px 18px 16px; }
+  .eyebrow { font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: #c3c2b7; }
+  h1 { font-size: 21px; line-height: 1.2; margin: 3px 0 2px; font-weight: 650; }
+  .hero-card .sub { color: #c3c2b7; font-size: 12px; }
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+  .kpi { background: #262624; border: 1px solid rgba(255,255,255,.10); border-radius: 10px; padding: 9px 10px 8px; text-align: left; color: inherit; transition: background .15s, border-color .15s; }
+  button.kpi:hover { background: #30302d; }
+  button.kpi.on { border-color: #f0efec; }
+  .kpi .v { font-size: 24px; font-weight: 650; line-height: 1.1; }
+  .kpi .v small { font-size: 14px; color: var(--star); margin-left: 1px; }
+  .kpi .k { font-size: 11px; color: #c3c2b7; margin-top: 2px; line-height: 1.25; }
+  .mix-title { display: flex; justify-content: space-between; align-items: baseline; margin: 16px 0 6px; font-size: 12px; color: #c3c2b7; }
+  .mix-title button { border: 0; background: none; color: #f0efec; text-decoration: underline; font-size: 12px; padding: 0; }
+  .mix { display: flex; gap: 2px; height: 14px; }
+  .mix button { border: 0; padding: 0; min-width: 4px; transition: opacity .15s, transform .15s; }
+  .mix button:first-child { border-radius: 4px 0 0 4px; } .mix button:last-child { border-radius: 0 4px 4px 0; }
+  .mix button:hover { transform: scaleY(1.35); }
+  .mix button[aria-pressed="false"] { opacity: .22; }
+  .tiers { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; margin-top: 10px; }
+  .tier-btn { display: flex; align-items: center; gap: 7px; padding: 4px 6px; border: 0; border-radius: 7px; background: none; color: #f0efec; font-size: 12.5px; text-align: left; }
+  .tier-btn:hover { background: #262624; }
+  .tier-btn[aria-pressed="false"] { opacity: .4; }
+  .tier-btn b { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .badge { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; color: #fff; font-size: 10px; font-weight: 700; flex: none; }
+  .controls { padding: 14px 14px 6px; }
+  .search { width: 100%; padding: 9px 12px; border: 1px solid var(--axis); border-radius: 10px; font: inherit; background: #fff; }
+  .search:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+  .seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; margin-top: 10px; padding: 3px; background: #ecebe6; border-radius: 10px; }
+  .seg button { border: 0; background: none; padding: 6px 2px; border-radius: 8px; font-size: 12px; color: var(--ink-2); }
+  .seg button[aria-pressed="true"] { background: #fff; color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+  .list-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px 6px; font-size: 12px; color: var(--ink-2); }
+  .pager { display: flex; gap: 4px; }
+  .pager button { width: 26px; height: 26px; border: 1px solid var(--axis); border-radius: 8px; background: #fff; line-height: 1; }
+  .pager button:disabled { opacity: .35; cursor: default; }
+  .list { padding: 0 10px 14px; display: grid; gap: 6px; }
+  .row { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); text-align: left; transition: transform .12s, box-shadow .12s, border-color .12s; }
+  .row:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,.09); border-color: var(--axis); }
+  .row.sel { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+  .row .rank { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; }
+  .row .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .meta { color: var(--ink-2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .meter { height: 4px; background: #ecebe6; border-radius: 2px; margin-top: 6px; overflow: hidden; }
+  .row .meter i { display: block; height: 100%; border-radius: 0 2px 2px 0; }
+  .row .score { display: flex; align-items: center; gap: 6px; }
+  .row .trend { font-size: 11px; color: var(--ink-2); text-align: right; margin-top: 1px; font-variant-numeric: tabular-nums; }
+  .row .num { font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .empty { padding: 22px 8px; color: var(--ink-2); text-align: center; }
+
+  /* ---- map ---- */
+  #map { height: 100%; background: #e9e8e3; }
+  /* mute the basemap so the store dots carry the colour */
+  .leaflet-tile-pane { filter: grayscale(1) contrast(.85) brightness(1.08); opacity: .75; }
+  .leaflet-tooltip { font: 12px/1.35 system-ui, sans-serif; }
+
+  /* ---- right: store detail ---- */
+  .detail { background: var(--surface); border-left: 1px solid var(--line); overflow-y: auto; min-height: 0; animation: slide .22s ease-out; }
+  @keyframes slide { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .detail { animation: none; } * { transition: none !important; } }
+  .no-detail .detail { display: none; }
+  .d-head { position: sticky; top: 0; z-index: 2; background: var(--surface); padding: 14px 18px 12px; border-bottom: 1px solid var(--line); display: flex; gap: 10px; align-items: flex-start; }
+  .d-head h2 { font-size: 17px; margin: 0; flex: 1; }
+  .d-head a { font-size: 12px; color: var(--accent); }
+  .x { border: 0; background: #eeede8; width: 30px; height: 30px; border-radius: 50%; font-size: 16px; line-height: 1; }
+  section { padding: 16px 18px; border-bottom: 1px solid var(--line); }
+  h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-2); margin: 0 0 10px; font-weight: 600; }
+  .hero { display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: center; }
+  .hero .big { font-size: 46px; font-weight: 650; line-height: 1; }
+  .stars { color: var(--star); letter-spacing: 1px; font-size: 15px; }
+  .stars .off { color: var(--line); }
+  .status { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; margin-top: 6px; }
+  .facts { color: var(--ink-2); font-size: 13px; }
+  .facts b { color: var(--ink); font-weight: 600; }
+  .dist { display: grid; grid-template-columns: 14px 1fr 30px; gap: 4px 8px; align-items: center; margin-top: 14px; font-size: 12px; color: var(--ink-2); }
+  .track { height: 8px; background: #efeee9; border-radius: 4px; overflow: hidden; }
+  .fill { height: 100%; background: var(--star); border-radius: 0 4px 4px 0; }
+  .dist .n { text-align: right; font-variant-numeric: tabular-nums; }
+  .dist-row { display: contents; cursor: pointer; }
+  .note { color: var(--ink-2); font-size: 12px; margin: 0 0 10px; }
+  .flag { display: inline-block; padding: 1px 7px; border: 1px solid var(--axis); border-radius: 999px; font-size: 11px; color: var(--ink-2); margin-left: 4px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; border: 1px solid transparent; font-size: 13px; }
+  .chip.neg { background: var(--critical-wash); }
+  .chip.pos { background: var(--good-wash); }
+  .chip .mark { font-weight: 700; }
+  .chip.neg .mark { color: var(--critical); }
+  .chip.pos .mark { color: #006300; }
+  .chip .c { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .chip.on { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+  .group + .group { margin-top: 14px; }
+  .group h4 { margin: 0 0 7px; font-size: 13px; }
+  .asp { display: grid; grid-template-columns: 88px 1fr 22px 22px 1fr; gap: 5px 6px; align-items: center; font-size: 12px; }
+  .asp-row { display: contents; cursor: pointer; }
+  .asp .lab { color: var(--ink); text-transform: capitalize; }
+  .asp-row.on .lab { font-weight: 700; text-decoration: underline; }
+  .asp .bar { height: 10px; display: flex; }
+  .asp .bar.l { justify-content: flex-end; }
+  .asp .bar i { display: block; height: 100%; min-width: 2px; }
+  .asp .bar.l i { background: var(--critical); border-radius: 4px 0 0 4px; }
+  .asp .bar.r i { background: var(--good); border-radius: 0 4px 4px 0; }
+  .asp .v { font-variant-numeric: tabular-nums; color: var(--ink-2); }
+  .asp .v.l { text-align: right; }
+  .asp-head { display: grid; grid-template-columns: 88px 1fr 1fr; gap: 6px; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .asp-head span:nth-child(2) { text-align: right; padding-right: 26px; }
+  .asp-head span:nth-child(3) { padding-left: 26px; }
+  .rv-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+  .pill { padding: 3px 10px; border: 1px solid var(--axis); border-radius: 999px; background: #fff; font-size: 12px; }
+  .pill.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .rv { padding: 12px 0; border-top: 1px solid var(--line); }
+  .rv .top { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--ink-2); }
+  .rv p { margin: 5px 0 6px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .tags { display: flex; flex-wrap: wrap; gap: 4px; }
+  .tag { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: #efeee9; }
+  .tag.neg { background: var(--critical-wash); } .tag.pos { background: var(--good-wash); }
+  .more { margin-top: 10px; width: 100%; padding: 8px; border: 1px solid var(--axis); border-radius: 8px; background: #fff; }
+  .legend { background: var(--surface); padding: 8px 10px; border-radius: 8px; box-shadow: 0 0 0 1px var(--ring); font-size: 12px; line-height: 1.7; }
+  .legend div { display: flex; align-items: center; gap: 6px; }
+  @media (max-width: 1100px) {
+    .app, .app.no-detail { grid-template-columns: 1fr; grid-template-rows: 45vh auto auto; height: auto; }
+    .side { order: 2; max-height: 60vh; } #map { order: 1; height: 45vh; } .detail { order: 3; border-left: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="app no-detail" id="app">
+  <aside class="side">
+    <div class="hero-card">
+      <div class="eyebrow" id="eyebrow"></div>
+      <h1 id="headline"></h1>
+      <div class="sub" id="asof"></div>
+      <div class="kpis" id="kpis"></div>
+      <div class="mix-title"><span>Health mix — click to filter</span><button id="reset" hidden>Reset</button></div>
+      <div class="mix" id="mix"></div>
+      <div class="tiers" id="tiers"></div>
+    </div>
+    <div class="controls">
+      <input class="search" id="q" type="search" placeholder="Search a store, mall or area" aria-label="Search stores">
+      <div class="seg" id="sort" role="group" aria-label="Sort stores"></div>
+    </div>
+    <div class="list-head"><span id="count"></span><span style="margin-left:auto;margin-right:8px">▲▼ vs all-time</span><span class="pager"><button id="prev" aria-label="Previous 10">‹</button><button id="next" aria-label="Next 10">›</button></span></div>
+    <div class="list" id="list"></div>
+  </aside>
+  <div id="map"></div>
+  <aside class="detail" id="detail"></aside>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="data/stores.js"></script>
+<script>
+(() => {
+  const STORES = window.STORES, META = window.META;
+  // tier index -> colour + glyph; -1 = too few reviews to judge. Colour never carries the tier alone.
+  const TIER = [
+    { color: 'var(--good)', hex: '#0ca30c', glyph: '✓' },
+    { color: 'var(--warning)', hex: '#fab219', glyph: '!' },
+    { color: 'var(--serious)', hex: '#ec835a', glyph: '▲' },
+    { color: 'var(--critical)', hex: '#d03b3b', glyph: '✕' },
+  ];
+  const NONE = { color: 'var(--none)', hex: '#898781', glyph: '?', label: 'Too few reviews' };
+  const tierOf = s => s.tier < 0 ? NONE : Object.assign({ label: META.tiers[s.tier].label }, TIER[s.tier]);
+  const winLabel = d => META.windowLabels[d] || `last ${d} days`;
+
+  const $ = id => document.getElementById(id);
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const badge = t => { const b = el('span', 'badge', t.glyph); b.style.background = t.color; b.title = t.label; return b; };
+  const starsEl = r => { const s = el('span', 'stars'); const n = Math.round(r); s.append('★'.repeat(n)); s.append(el('span', 'off', '★'.repeat(5 - n))); s.setAttribute('aria-label', `${r} stars`); return s; };
+
+  const PAGE = 10, ALL_TIERS = [0, 1, 2, 3, -1], DROP = 0.5;
+  const SORTS = [['worst', 'Worst first'], ['drop', 'Biggest drop'], ['best', 'Best first'], ['count', 'Most reviews']];
+  const state = { q: '', sort: 'worst', tiers: new Set(ALL_TIERS), dropping: false, page: 0, sel: null, filter: null, shown: 30 };
+  const tierInfo = i => i < 0 ? NONE : Object.assign({ label: META.tiers[i].label }, TIER[i]);
+  const isDropping = s => s.tier >= 0 && s.raw - s.all <= -DROP;
+  const MARK = { radius: 6, color: '#fff', weight: 1.5 }, MARK_HOT = { radius: 10, color: '#0b0b0b', weight: 2.5 };
+  const cache = {};
+
+  /* ---------- map ---------- */
+  const map = L.map('map', { preferCanvas: true }).fitBounds(L.latLngBounds(STORES.map(s => [s.la, s.lo])).pad(0.05));
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; OpenStreetMap contributors',
+  }).addTo(map);
+  const markers = {};
+  STORES.forEach(s => {
+    const t = tierOf(s);
+    const m = L.circleMarker([s.la, s.lo], { radius: 6, color: '#fff', weight: 1.5, fillColor: t.hex, fillOpacity: .95 });
+    m.on('mouseover', () => m.setStyle(MARK_HOT).bringToFront());
+    m.on('mouseout', () => { if (s.i !== state.sel) m.setStyle(MARK); });
+    m.bindTooltip(`<b>${s.t.replace(/</g, '&lt;')}</b><br>${labelOf(s)}<br>${t.label}`, { direction: 'top', offset: [0, -4] });
+    m.on('click', () => select(s.i, false));
+    markers[s.i] = m;
+  });
+  const legend = L.control({ position: 'bottomleft' });
+  legend.onAdd = () => {
+    const d = el('div', 'legend');
+    META.tiers.forEach((t, i) => {
+      const next = i === 0 ? '5.0' : (META.tiers[i - 1].min - 0.01).toFixed(1);
+      const r = el('div'); r.append(badge(Object.assign({ label: t.label }, TIER[i])), `${t.label} · ${t.min ? t.min.toFixed(1) : '1.0'}–${next}★`); d.append(r);
+    });
+    const r = el('div'); r.append(badge(NONE), `Fewer than ${META.minReviews} reviews`); d.append(r);
+    return d;
+  };
+  legend.addTo(map);
+
+  function labelOf(s) {
+    return s.raw == null ? 'No reviews' : `${s.raw.toFixed(1)}★ · ${s.n} review${s.n === 1 ? '' : 's'} · ${winLabel(s.w)}`;
+  }
+
+  /* ---------- overview + list ---------- */
+  function visible() {
+    const q = state.q.trim().toLowerCase();
+    const out = STORES.filter(s => state.tiers.has(s.tier) && (!state.dropping || isDropping(s))
+      && (!q || s.t.toLowerCase().includes(q) || s.id.includes(q)));
+    const judged = s => s.tier >= 0 ? 0 : 1;  // stores with too few reviews always sort last
+    const by = {
+      worst: (a, b) => judged(a) - judged(b) || a.raw - b.raw,
+      best: (a, b) => judged(a) - judged(b) || b.raw - a.raw,
+      drop: (a, b) => judged(a) - judged(b) || (a.raw - a.all) - (b.raw - b.all),
+      count: (a, b) => b.n - a.n,
+    }[state.sort];
+    return out.sort(by);
+  }
+
+  function renderOverview() {
+    const judged = STORES.filter(s => s.tier >= 0);
+    const reviews = STORES.reduce((a, s) => a + s.n, 0);
+    const avg = STORES.reduce((a, s) => a + (s.raw || 0) * s.n, 0) / Math.max(1, reviews);
+    const attention = judged.filter(s => s.tier >= 2).length, dropping = STORES.filter(isDropping).length;
+    $('headline').textContent = `${attention} of ${STORES.length} stores need attention`;
+    $('asof').textContent = `Recent Google reviews up to ${new Date(META.asOf + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+
+    const onlyAttention = state.tiers.size === 2 && state.tiers.has(2) && state.tiers.has(3);
+    const kpis = $('kpis'); kpis.replaceChildren();
+    const kpi = (value, unit, label, on, click, tip) => {
+      const k = el(click ? 'button' : 'div', 'kpi' + (on ? ' on' : '')), v = el('div', 'v', value);
+      if (unit) v.append(el('small', null, unit));
+      k.append(v, el('div', 'k', label)); k.title = tip;
+      if (click) { k.onclick = click; k.setAttribute('aria-pressed', !!on); }
+      kpis.append(k);
+    };
+    kpi(avg.toFixed(1), '★', 'network recent rating', false, null, 'Average of recent ratings across all stores, weighted by review count');
+    kpi(attention, '', 'At risk or Critical', onlyAttention, () => { state.tiers = new Set(onlyAttention ? ALL_TIERS : [2, 3]); refresh(); }, 'Show only stores rated below 3.7★ recently');
+    kpi(dropping, '', `fell ${DROP}★+ vs all-time`, state.dropping, () => { state.dropping = !state.dropping; if (state.dropping) state.sort = 'drop'; refresh(); }, `Show only stores whose recent rating is at least ${DROP}★ below their all-time average`);
+
+    const counts = {}; STORES.forEach(s => counts[s.tier] = (counts[s.tier] || 0) + 1);
+    const toggle = i => {
+      // first click on a full selection isolates that tier; afterwards clicks add / remove
+      if (state.tiers.size === ALL_TIERS.length) state.tiers = new Set([i]);
+      else { state.tiers.has(i) ? state.tiers.delete(i) : state.tiers.add(i); if (!state.tiers.size) state.tiers = new Set(ALL_TIERS); }
+      refresh();
+    };
+    const mix = $('mix'), box = $('tiers'); mix.replaceChildren(); box.replaceChildren();
+    ALL_TIERS.forEach(i => {
+      const t = tierInfo(i), n = counts[i] || 0, on = state.tiers.has(i);
+      const seg = el('button'); seg.style.flex = `${n} 1 0`; seg.style.background = t.hex;
+      seg.title = `${t.label}: ${n} stores (${(100 * n / STORES.length).toFixed(0)}%)`; seg.setAttribute('aria-label', seg.title);
+      seg.setAttribute('aria-pressed', on); seg.onclick = () => toggle(i); mix.append(seg);
+      const b = el('button', 'tier-btn'); b.setAttribute('aria-pressed', on);
+      b.append(badge(t), t.label, el('b', null, n)); b.onclick = () => toggle(i); box.append(b);
+    });
+    $('reset').hidden = state.tiers.size === ALL_TIERS.length && !state.dropping && !state.q;
+
+    const seg = $('sort'); seg.replaceChildren();
+    SORTS.forEach(([key, label]) => {
+      const b = el('button', null, label); b.setAttribute('aria-pressed', state.sort === key);
+      b.onclick = () => { state.sort = key; refresh(); }; seg.append(b);
+    });
+  }
+
+  function renderList() {
+    const rows = visible(), list = $('list');
+    const pages = Math.max(1, Math.ceil(rows.length / PAGE));
+    state.page = Math.min(state.page, pages - 1);
+    const start = state.page * PAGE, page = rows.slice(start, start + PAGE);
+    list.replaceChildren();
+    $('count').textContent = rows.length ? `${start + 1}–${start + page.length} of ${rows.length} stores` : '0 stores';
+    $('prev').disabled = state.page === 0; $('next').disabled = state.page >= pages - 1;
+    if (!rows.length) list.append(el('div', 'empty', 'No stores match these filters.'));
+    page.forEach((s, k) => {
+      const t = tierOf(s), b = el('button', 'row' + (s.i === state.sel ? ' sel' : ''));
+      b.dataset.i = s.i;
+      const mid = el('div'); mid.style.minWidth = 0;
+      const d = s.raw == null ? 0 : s.raw - s.all;
+      const trend = s.tier >= 0 && Math.abs(d) >= 0.05 ? `${d < 0 ? '▼' : '▲'} ${Math.abs(d).toFixed(1)}` : '';
+      const meter = el('div', 'meter'), fill = el('i'); fill.style.width = (100 * (s.raw || 0) / 5) + '%'; fill.style.background = t.color; meter.append(fill);
+      mid.append(el('div', 'name', s.t), el('div', 'meta', `${s.n} reviews · ${winLabel(s.w)}`), meter);
+      const score = el('div', 'score'); score.append(el('span', 'num', s.raw == null ? '–' : s.raw.toFixed(1)), badge(t));
+      const right = el('div'); right.append(score);
+      if (trend) { const tr = el('div', 'trend', trend); tr.title = `${trend} vs all-time average of ${s.all.toFixed(1)}★`; right.append(tr); }
+      b.append(el('span', 'rank', start + k + 1), mid, right);
+      b.onclick = () => select(s.i, true);
+      b.onmouseenter = () => { markers[s.i].setStyle(MARK_HOT).bringToFront().openTooltip(); };
+      b.onmouseleave = () => { markers[s.i].closeTooltip(); if (s.i !== state.sel) markers[s.i].setStyle(MARK); };
+      list.append(b);
+    });
+    const shown = new Set(rows.map(s => s.i));
+    STORES.forEach(s => shown.has(s.i) ? markers[s.i].addTo(map) : markers[s.i].remove());
+    return rows;
+  }
+
+  function refresh(fit) {
+    state.page = 0; renderOverview();
+    const rows = renderList();
+    if (fit && rows.length) map.flyToBounds(L.latLngBounds(rows.map(s => [s.la, s.lo])).pad(0.2), { maxZoom: 14, duration: .6 });
+  }
+
+  /* ---------- detail ---------- */
+  function select(i, pan) {
+    if (state.sel != null && markers[state.sel]) markers[state.sel].setStyle(MARK);
+    state.sel = i; state.filter = null; state.shown = 30;
+    const s = STORES[i];
+    markers[i].setStyle(MARK_HOT).bringToFront();
+    $('app').classList.remove('no-detail');
+    map.invalidateSize();
+    if (pan) map.flyTo([s.la, s.lo], Math.max(map.getZoom(), 13), { duration: .7 });
+    document.querySelectorAll('.row.sel').forEach(r => r.classList.remove('sel'));
+    const row = document.querySelector(`.row[data-i="${i}"]`); if (row) row.classList.add('sel');
+    history.replaceState(null, '', '?store=' + i);
+    if (cache[i]) return renderDetail();
+    $('detail').replaceChildren(el('section', null, 'Loading…'));
+    const sc = document.createElement('script'); sc.src = `data/s/${i}.js`;
+    sc.onerror = () => $('detail').replaceChildren(el('section', null, 'Could not load this store. Re-run: python -m src.build_ui'));
+    document.body.append(sc);
+  }
+  window.__store = (i, d) => { cache[i] = d; if (state.sel === i) renderDetail(); };
+
+  function closeDetail() {
+    if (state.sel != null) markers[state.sel].setStyle(MARK);
+    state.sel = null; $('app').classList.add('no-detail'); map.invalidateSize();
+    document.querySelectorAll('.row.sel').forEach(r => r.classList.remove('sel'));
+    history.replaceState(null, '', location.pathname);
+  }
+
+  function setFilter(f) {
+    const same = state.filter && f && state.filter.kind === f.kind && state.filter.value === f.value;
+    state.filter = same ? null : f; state.shown = 30; renderDetail(true);
+  }
+
+  function chip(phrase, n, cls) {
+    const b = el('button', `chip ${cls}`);
+    if (state.filter && state.filter.kind === 'phrase' && state.filter.value === phrase) b.classList.add('on');
+    b.append(el('span', 'mark', cls === 'neg' ? '−' : '+'), phrase, el('span', 'c', n));
+    b.title = `${n} review${n === 1 ? '' : 's'} mention "${phrase}" — click to see them`;
+    b.onclick = () => setFilter({ kind: 'phrase', value: phrase });
+    return b;
+  }
+
+  function renderDetail(keepScroll) {
+    const s = STORES[state.sel], d = cache[state.sel], box = $('detail'), t = tierOf(s);
+    const scroll = keepScroll ? box.scrollTop : 0;
+    box.replaceChildren();
+
+    const head = el('div', 'd-head');
+    const hw = el('div'); hw.style.flex = '1';
+    const gm = el('a', null, 'Open in Google Maps ↗');
+    gm.href = `https://www.google.com/maps/search/?api=1&query=${s.la},${s.lo}`; gm.target = '_blank'; gm.rel = 'noopener';
+    hw.append(el('h2', null, s.t), gm);
+    const x = el('button', 'x', '×'); x.setAttribute('aria-label', 'Close'); x.onclick = closeDetail;
+    head.append(hw, x); box.append(head);
+
+    /* rating */
+    const rate = el('section');
+    rate.append(el('h3', null, 'Recent rating'));
+    const hero = el('div', 'hero');
+    const left = el('div');
+    left.append(el('div', 'big', s.raw == null ? '–' : s.raw.toFixed(1)), starsEl(s.raw || 0));
+    const right = el('div', 'facts');
+    const st = el('div', 'status'); st.append(badge(t), t.label); right.append(st);
+    right.append(el('div', null, `${s.n} review${s.n === 1 ? '' : 's'} · ${winLabel(s.w)}`));
+    const all = el('div'); all.append('All-time ', el('b', null, `${s.all.toFixed(1)}★`), ` (${s.alln} reviews)`);
+    const delta = s.raw == null ? 0 : s.raw - s.all;
+    if (Math.abs(delta) >= 0.05) all.append(' · ', el('b', null, `${delta < 0 ? '▼' : '▲'} ${Math.abs(delta).toFixed(1)} recently`));
+    right.append(all, el('div', null, `Smoothed average ${s.sm.toFixed(2)}★`));
+    hero.append(left, right); rate.append(hero);
+    const dist = el('div', 'dist'), max = Math.max(1, ...d.stars);
+    [5, 4, 3, 2, 1].forEach(k => {
+      const r = el('div', 'dist-row'); r.title = `${d.stars[k - 1]} × ${k}★ in this window — click to see written reviews`;
+      const tr = el('div', 'track'), f = el('div', 'fill'); f.style.width = (100 * d.stars[k - 1] / max) + '%'; tr.append(f);
+      r.append(el('span', null, k), tr, el('span', 'n', d.stars[k - 1]));
+      r.onclick = () => setFilter({ kind: 'stars', value: k });
+      dist.append(r);
+    });
+    rate.append(dist); box.append(rate);
+
+    /* phrases */
+    const ph = el('section');
+    ph.append(el('h3', null, 'What customers say'));
+    const note = el('p', 'note', `From ${s.nt} written review${s.nt === 1 ? '' : 's'} · ${winLabel(s.pw)}`);
+    if (s.lc) { const f = el('span', 'flag', 'Low confidence'); f.title = `Fewer than ${META.minTextReviews} written reviews in the last 12 months, so the window was widened to 2 years.`; note.append(f); }
+    ph.append(note);
+    const g1 = el('div', 'group'); g1.append(el('h4', null, `Fix now (${s.nn} complaint${s.nn === 1 ? '' : 's'})`));
+    const c1 = el('div', 'chips'); d.neg.forEach(([p, n]) => c1.append(chip(p, n, 'neg')));
+    g1.append(d.neg.length ? c1 : el('div', 'note', 'No negative phrases found.'));
+    const g2 = el('div', 'group'); g2.append(el('h4', null, `Customers praise (${s.np} mention${s.np === 1 ? '' : 's'})`));
+    const c2 = el('div', 'chips'); d.pos.forEach(([p, n]) => c2.append(chip(p, n, 'pos')));
+    g2.append(d.pos.length ? c2 : el('div', 'note', 'No positive phrases found.'));
+    ph.append(g1, g2); box.append(ph);
+
+    /* aspects */
+    if (d.aspects.length) {
+      const as = el('section');
+      as.append(el('h3', null, 'By topic · reviews mentioning it'));
+      const hd = el('div', 'asp-head'); hd.append(el('span'), el('span', null, '− Complaints'), el('span', null, '+ Praise')); as.append(hd);
+      const grid = el('div', 'asp'), m = Math.max(1, ...d.aspects.map(a => Math.max(a[1], a[2])));
+      d.aspects.forEach(([name, pos, neg]) => {
+        const r = el('div', 'asp-row' + (state.filter && state.filter.kind === 'aspect' && state.filter.value === name ? ' on' : ''));
+        r.title = `${name}: ${neg} complaint${neg === 1 ? '' : 's'}, ${pos} praise — click to see the reviews`;
+        const l = el('div', 'bar l'), rr = el('div', 'bar r');
+        if (neg) { const i = el('i'); i.style.width = (100 * neg / m) + '%'; l.append(i); }
+        if (pos) { const i = el('i'); i.style.width = (100 * pos / m) + '%'; rr.append(i); }
+        r.append(el('span', 'lab', name), l, el('span', 'v l', neg), el('span', 'v', pos), rr);
+        r.onclick = () => setFilter({ kind: 'aspect', value: name });
+        grid.append(r);
+      });
+      as.append(grid); box.append(as);
+    }
+
+    /* reviews */
+    const rv = el('section'); rv.style.borderBottom = '0';
+    const f = state.filter;
+    const match = r => !f
+      || (f.kind === 'phrase' && r.p.some(p => p[0] === f.value))
+      || (f.kind === 'aspect' && r.p.some(p => p[2] === f.value))
+      || (f.kind === 'stars' && r.r === f.value);
+    const rows = d.reviews.filter(match);
+    rv.append(el('h3', null, `Written reviews (${rows.length}${f ? ' of ' + d.reviews.length : ''})`));
+    if (f) {
+      const bar = el('div', 'rv-bar');
+      const p = el('button', 'pill on', `${f.kind === 'stars' ? f.value + '★' : f.value} ×`); p.onclick = () => setFilter(null);
+      bar.append('Showing', p); rv.append(bar);
+    }
+    rows.slice(0, state.shown).forEach(r => {
+      const item = el('div', 'rv'), top = el('div', 'top');
+      top.append(starsEl(r.r), new Date(r.d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }));
+      item.append(top, el('p', null, r.x));
+      if (r.p.length) {
+        const tags = el('div', 'tags');
+        r.p.forEach(([p, pol]) => tags.append(el('span', 'tag ' + (pol > 0 ? 'pos' : pol < 0 ? 'neg' : ''), (pol > 0 ? '+ ' : pol < 0 ? '− ' : '') + p)));
+        item.append(tags);
+      }
+      rv.append(item);
+    });
+    if (!rows.length) rv.append(el('div', 'note', 'No written reviews match.'));
+    if (rows.length > state.shown) {
+      const more = el('button', 'more', `Show more (${rows.length - state.shown} left)`);
+      more.onclick = () => { state.shown += 30; renderDetail(true); };
+      rv.append(more);
+    }
+    box.append(rv);
+    box.scrollTop = scroll;
+  }
+
+  /* ---------- wire up ---------- */
+  let typing;
+  $('q').oninput = e => { state.q = e.target.value; clearTimeout(typing); typing = setTimeout(() => refresh(!!state.q.trim()), 250); };
+  $('reset').onclick = () => { state.tiers = new Set(ALL_TIERS); state.dropping = false; state.q = ''; $('q').value = ''; refresh(); };
+  $('eyebrow').textContent = `Subway ${META.scope} · review health`;
+  document.title = `Subway ${META.scope} store review health`;
+  $('prev').onclick = () => { state.page--; renderList(); };
+  $('next').onclick = () => { state.page++; renderList(); };
+  refresh();
+  const pre = new URLSearchParams(location.search).get('store');
+  if (pre != null && STORES[+pre]) select(+pre, true);
+})();
+</script>
+</body>
+</html>

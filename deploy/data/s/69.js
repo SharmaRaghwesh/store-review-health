@@ -1,0 +1,1 @@
+window.__store(69,{"stars":[1,0,0,0,0],"pos":[],"neg":[],"aspects":[],"reviews":[{"d":"2025-11-21","r":1,"x":"Nadeem Manager i don't know how your managing subway, This fellow uday is saying store is close even it is open,  are you people thinking that customers are coming for begging you,","p":[],"w":1}]});

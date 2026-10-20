@@ -1,0 +1,11 @@
+# full data stays local — only deploy/ (one city) is published
+*.csv
+*.parquet
+outputs/
+ui/data/
+
+# local environment
+.venv/
+__pycache__/
+.vercel/
+.DS_Store

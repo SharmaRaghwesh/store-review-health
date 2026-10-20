@@ -1,0 +1,1 @@
+window.__store(2,{"stars":[1,0,0,0,1],"pos":[],"neg":[["slow service",1]],"aspects":[["service",0,1]],"reviews":[{"d":"2024-11-10","r":1,"x":"Service is deathly slow. Would not recommend for a quick bite.","p":[["slow service",-1,"service"]],"w":1}]});

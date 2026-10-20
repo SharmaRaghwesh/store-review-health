@@ -1,0 +1,1 @@
+window.__store(65,{"stars":[0,0,0,0,1],"pos":[["good service",1],["good taste",1]],"neg":[],"aspects":[["service",1,0],["taste",1,0]],"reviews":[{"d":"2024-12-20","r":5,"x":"Good service and good taste \ud83d\udcaf","p":[["good service",1,"service"],["good taste",1,"taste"]],"w":1}]});
